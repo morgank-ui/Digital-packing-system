@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: parksmart-ke
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/config
+    envVars:
+      - key: PARK_ADMIN_PASSWORD
+        generateValue: true

@@ -1,0 +1,12 @@
+.git
+.vscode
+build
+parksmart-ke (1)
+*.db
+*.db-shm
+*.db-wal
+parksmart
+parksmart.exe
+test_core
+test_core.exe
+Task-One-Analysis.md

@@ -117,15 +117,40 @@ A partial unique index guarantees one active ticket per plate even if two reques
 * Manager login is a single shared password for a course project. Production needs hashed passwords, sessions and HTTPS.
 * Times are stored as UTC epoch seconds; "today" in the report is midnight to midnight East Africa Time (UTC+3).
 
-## Publish to GitHub
+## Deploy as a public web app
+
+This application needs its C++ server and SQLite database at runtime. GitHub Pages only
+hosts static files, so it cannot run the parking API. This repository includes a Docker
+image and Render Blueprint for a GitHub-connected deployment.
+
+1. Push this repository to GitHub (see the commands below).
+2. In Render, choose **New > Blueprint**, connect `morgank-ui/Digital-packing-system`,
+   and deploy the `render.yaml` blueprint. Render builds the server and serves the web
+   interface from the same address; no separate API URL or CORS setup is needed.
+3. Open the deployed `onrender.com` URL. Render generates `PARK_ADMIN_PASSWORD`; find
+   it under the service's **Environment** settings and use it on the Manager screen.
+4. For data that must survive restarts and redeploys, attach a persistent disk at
+   `/data` on a Render plan that supports disks. The free service uses temporary storage,
+   so its SQLite data can be lost when the service restarts or redeploys. Free instances
+   may also sleep when idle.
+
+The blueprint enables the normal application mode (not demo mode). M-Pesa and the
+barrier are still simulations as described above. This project is a course/demo system,
+not a production-ready public parking or payment service.
+
+To push the current local repository changes:
 
 ```bash
-git init
-git add .
-git commit -m "ParkSmart KE: automated parking system in C++"
-git branch -M main
-git remote add origin https://github.com/<your-username>/parksmart-ke.git
-git push -u origin main
+git add Dockerfile render.yaml README.md
+git commit -m "Add web deployment configuration"
+git push origin main
+```
+
+If you have not cloned the repository yet, use:
+
+```bash
+git clone https://github.com/morgank-ui/Digital-packing-system.git
+cd Digital-packing-system
 ```
 
 ## Project layout
