@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParkSmart KE - Automated parking</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%231F5FBF'/%3E%3Ctext x='32' y='47' font-size='44' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   ParkSmart KE - styles
+   Visual language: a real car park. Concrete floor, asphalt bays with painted
+   white lines, an amber LED entrance sign, and the yellow Kenyan rear number plate.
+   ========================================================================== */
+:root {
+  --concrete: #d3d7da;
+  --paper: #eef0f1;
+  --asphalt: #262a30;
+  --asphalt-2: #343a41;
+  --ink: #1a1d21;
+  --muted: #57606a;
+  --paint: #f1f3f4;      /* white road paint */
+  --kerb: #f4c20d;       /* yellow kerb / plate */
+  --bay: #2ead73;        /* free bay */
+  --bay-text: #7be0b0;
+  --taken: #e0503f;      /* occupied bay */
+  --sign-blue: #1f5fbf;  /* the universal parking sign */
+  --led: #ffb22e;
+  --display: 'Big Shoulders Display', 'Arial Narrow', 'Roboto Condensed', Impact, sans-serif;
+  --body: 'Barlow', system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--concrete); color: var(--ink); font: 400 17px/1.5 var(--body); }
+h1, h2, h3 { font-family: var(--display); font-weight: 800; line-height: 1.05; margin: 0; letter-spacing: .01em; }
+h2 { font-size: 40px; margin-bottom: 8px; }
+h3 { font-size: 26px; margin-bottom: 8px; }
+p { margin: 0 0 12px; }
+button, input, select { font: inherit; }
+:focus-visible { outline: 4px solid var(--sign-blue); outline-offset: 3px; }
+[hidden] { display: none !important; }
+
+/* ---------- header ---------- */
+.site { background: var(--asphalt); color: var(--paint); border-bottom: 5px solid var(--kerb);
+        display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 32px; padding: 14px 24px 0; }
+.brand { display: flex; align-items: center; gap: 14px; padding-bottom: 12px; }
+.psign { width: 46px; height: 46px; border-radius: 8px; background: var(--sign-blue); color: #fff;
+         border: 3px solid #fff; display: grid; place-items: center; font: 900 32px/1 var(--display); }
+.brand h1 { font-size: 34px; color: #fff; }
+.brand p { margin: 0; font-size: 14px; color: #aab2ba; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.tab { background: transparent; color: #cfd5da; border: 0; border-radius: 8px 8px 0 0; padding: 12px 20px;
+       font: 700 17px var(--body); cursor: pointer; }
+.tab:hover { background: var(--asphalt-2); color: #fff; }
+.tab[aria-selected="true"] { background: var(--kerb); color: #111; }
+.offline { background: var(--taken); color: #fff; text-align: center; padding: 8px 16px; font-weight: 600; }
+
+main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 56px; }
+.lead { max-width: 60ch; color: var(--muted); }
+.two { display: grid; grid-template-columns: minmax(300px, 460px) 1fr; gap: 32px; align-items: start; }
+@media (max-width: 900px) { .two, .board { grid-template-columns: 1fr !important; } }
+
+/* ---------- LED entrance sign (the first thing a driver sees) ---------- */
+.board { display: grid; grid-template-columns: minmax(280px, 350px) 1fr; gap: 28px; align-items: start; }
+.sign { background: #0d0f12; border: 7px solid #444c55; border-radius: 14px; padding: 20px 22px 18px; color: var(--led);
+        box-shadow: inset 0 0 0 2px #000; }
+.sign .cap { font-weight: 600; font-size: 19px; opacity: .8; }
+.sign .num { font: 900 148px/.95 var(--display); text-shadow: 0 0 22px rgba(255,178,46,.45); margin: 2px 0 4px; }
+.sign .of { font-size: 17px; opacity: .8; }
+.sign.full { color: #ff6a58; }
+.sign.full .num { font-size: 104px; text-shadow: 0 0 22px rgba(255,90,70,.45); }
+.zones { list-style: none; margin: 16px 0 0; padding: 12px 0 0; border-top: 2px dashed #4a525b; }
+.zones li { display: flex; justify-content: space-between; font: 700 22px/1.5 var(--display); letter-spacing: .03em; }
+.zones li span:last-child { font-family: var(--body); font-size: 16px; font-weight: 600; opacity: .85; }
+
+.tariff { margin-top: 20px; background: var(--paper); border: 3px solid var(--ink); border-radius: 6px; padding: 14px 18px; }
+.tariff h3 { margin-bottom: 6px; }
+.tariff ul { list-style: none; margin: 0; padding: 0; }
+.tariff li { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid #b9bfc4; }
+.tariff li:last-child { border-bottom: 0; }
+.tariff .fee { font: 800 26px/1 var(--display); }
+
+/* ---------- the lot: asphalt with painted bays ---------- */
+.lot-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 10px; }
+.lot-head h2 { margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; margin: 0; padding: 0; font-size: 15px; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 7px; }
+.sw { width: 16px; height: 22px; border-left: 3px solid var(--paint); border-right: 3px solid var(--paint); background: #262a30; display: inline-block; }
+.sw.free { background: rgba(46,173,115,.55); }
+.sw.taken { background: var(--taken); }
+.sw.closed { background: repeating-linear-gradient(-45deg, var(--kerb) 0 4px, #262a30 4px 8px); }
+.lot { background: var(--asphalt); border-radius: 10px; padding: 20px 18px; display: flex; flex-direction: column; gap: 22px; min-height: 120px; }
+.zone { display: flex; gap: 14px; align-items: stretch; }
+.zone-name { flex: 0 0 44px; display: grid; place-items: center; font: 900 46px/1 var(--display); color: var(--kerb); }
+.bays { display: flex; flex-wrap: wrap; padding-left: 3px; row-gap: 12px; }
+.bay { position: relative; width: 62px; height: 88px; margin-left: -3px; padding: 0; background: transparent; color: var(--paint);
+       border: 0; border-left: 3px solid var(--paint); border-right: 3px solid var(--paint); border-radius: 2px; cursor: default; }
+.bay .label { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font: 600 13px/1 var(--body); }
+.bay .car { position: absolute; left: 50%; top: 10px; width: 34px; height: 56px; transform: translateX(-50%); }
+.bay.free { background: rgba(46,173,115,.2); }
+.bay.free .label { color: var(--bay-text); }
+.bay.taken .label { color: #b7bdc4; }
+.bay.closed { background: repeating-linear-gradient(-45deg, rgba(244,194,13,.5) 0 6px, transparent 6px 12px); }
+.bay.closed .label { color: var(--kerb); }
+button.bay { cursor: pointer; }
+button.bay:hover { filter: brightness(1.3); }
+.bay.selected { outline: 4px solid var(--kerb); outline-offset: -4px; background: rgba(244,194,13,.3); }
+.empty { color: #aab2ba; margin: 0; }
+
+/* ---------- forms ---------- */
+label.field { display: block; font-weight: 600; margin: 18px 0 6px; }
+.plate { display: block; width: 100%; max-width: 430px; padding: 8px 14px; background: var(--kerb); color: #111; text-align: center;
+         border: 4px solid #111; border-radius: 10px; font: 800 54px/1.1 var(--display); letter-spacing: .07em; text-transform: uppercase; }
+.plate::placeholder { color: rgba(0,0,0,.28); }
+.input { width: 100%; max-width: 300px; padding: 10px 12px; background: #fff; border: 2px solid var(--ink); border-radius: 6px; }
+.btn { display: inline-block; padding: 12px 24px; border: 2px solid var(--ink); border-radius: 6px; background: var(--ink); color: #fff;
+       font: 700 18px var(--body); cursor: pointer; }
+.btn.primary { background: var(--kerb); color: #111; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.small { padding: 4px 10px; font-size: 14px; }
+.btn:hover:not(:disabled) { filter: brightness(1.12); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; align-items: center; }
+.link { background: none; border: 0; padding: 0; color: var(--sign-blue); text-decoration: underline; cursor: pointer; }
+.chosen { margin-top: 14px; color: var(--muted); }
+.msg { margin-top: 16px; padding: 12px 14px; border-left: 6px solid var(--muted); background: var(--paper); border-radius: 0 6px 6px 0; }
+.msg:empty { display: none; }
+.msg.error { border-color: var(--taken); }
+.msg.ok { border-color: var(--bay); }
+.msg.warn { border-color: var(--kerb); }
+
+.methods { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 16px 0 0; }
+.methods legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
+.methods label { border: 2px solid var(--ink); border-radius: 6px; padding: 8px 18px; cursor: pointer; font-weight: 600; background: #fff; }
+.methods input { position: absolute; opacity: 0; }
+.methods label:has(input:checked) { background: var(--ink); color: #fff; }
+.methods label:has(input:focus-visible) { outline: 4px solid var(--sign-blue); outline-offset: 3px; }
+
+/* ---------- ticket stub, stay summary, barrier ---------- */
+.ticket { display: grid; grid-template-columns: 1fr auto; margin-top: 22px; background: #fff; border: 2px solid var(--ink); border-radius: 4px; max-width: 460px; }
+.ticket > div { padding: 14px 18px; }
+.ticket .stub { border-left: 3px dashed var(--ink); text-align: center; display: grid; align-content: center; min-width: 120px; }
+.ticket .big { font: 900 52px/1 var(--display); }
+.ticket .no { font: 800 26px/1 var(--display); margin-bottom: 6px; }
+.ticket p { margin: 0; color: var(--muted); }
+
+.panel { background: var(--paper); border: 2px solid var(--ink); border-radius: 4px; padding: 20px; margin-top: 22px; max-width: 560px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 22px; margin: 0 0 14px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; }
+.due { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
+.due .amt { font: 900 68px/1 var(--display); }
+.due.clear .amt { color: #1c7f52; }
+.note { margin: 10px 0 0; color: var(--muted); }
+.receipt { margin-top: 22px; padding: 16px 18px; background: #fff; border: 2px solid var(--ink); border-radius: 4px; max-width: 460px; }
+.receipt .big { font: 900 44px/1 var(--display); margin: 6px 0 10px; }
+
+.barrier { margin-top: 22px; max-width: 240px; }
+.barrier svg { width: 100%; height: auto; display: block; overflow: visible; }
+.barrier .arm { transition: transform 1s cubic-bezier(.3,.7,.2,1); transform-origin: 40px 210px; }
+.barrier[data-state="open"] .arm { transform: rotate(-64deg); }
+.barrier .lamp { fill: var(--taken); }
+.barrier[data-state="open"] .lamp { fill: var(--bay); }
+.barrier p { margin: 4px 0 0; font-weight: 600; }
+
+/* ---------- manager ---------- */
+.ledger { display: flex; flex-wrap: wrap; margin: 18px 0 8px; border-top: 4px solid var(--ink); border-bottom: 4px solid var(--ink); background: var(--paper); }
+.ledger > div { flex: 1 1 150px; padding: 12px 16px; border-right: 2px solid #b9bfc4; }
+.ledger > div:last-child { border-right: 0; }
+.ledger dt { color: var(--muted); font-size: 15px; }
+.ledger dd { margin: 0; font: 800 34px/1.1 var(--display); }
+.cols { display: grid; grid-template-columns: 1fr minmax(260px, 360px); gap: 28px; align-items: start; margin-top: 26px; }
+@media (max-width: 960px) { .cols { grid-template-columns: 1fr; } }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; background: var(--paper); border: 2px solid var(--ink); font-size: 16px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #b9bfc4; white-space: nowrap; }
+th { background: var(--ink); color: #fff; font-weight: 600; }
+td.num, th.num { text-align: right; }
+.feed { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; border: 2px solid var(--ink); background: var(--paper); }
+.feed li { padding: 8px 12px; border-bottom: 1px solid #b9bfc4; font-size: 15px; }
+.feed time { color: var(--muted); margin-right: 8px; font-weight: 600; }
+.inline { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.inline .input { width: 140px; }
+section.block { margin-top: 34px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (max-width: 600px) {
+  .site { padding: 12px 12px 0; } .tabs { margin-left: 0; width: 100%; } .tab { flex: 1; padding: 12px 6px; font-size: 15px; }
+  main { padding: 20px 14px 40px; } h2 { font-size: 34px; } .plate { font-size: 44px; }
+  .sign .num { font-size: 120px; } .due .amt { font-size: 56px; }
+  .bay { width: 44px; height: 74px; } .bay .car { width: 26px; height: 44px; top: 8px; } .bay .label { font-size: 11px; }
+  .zone { gap: 8px; } .zone-name { flex-basis: 26px; font-size: 34px; } .lot { padding: 14px 10px; }
+}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="brand">
+    <span class="psign" aria-hidden="true">P</span>
+    <div><h1>ParkSmart KE</h1><p>Automated parking for Kenya</p></div>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Screens">
+    <button class="tab" role="tab" data-view="board" aria-selected="true">Availability</button>
+    <button class="tab" role="tab" data-view="entry" aria-selected="false">Entry gate</button>
+    <button class="tab" role="tab" data-view="exit" aria-selected="false">Exit and payment</button>
+    <button class="tab" role="tab" data-view="manager" aria-selected="false">Manager</button>
+  </nav>
+</header>
+<div id="offline" class="offline" hidden role="alert">Cannot reach the parking server. Retrying...</div>
+
+<main>
+
+<!-- ============ 1. Availability display (what drivers see before entry) ============ -->
+<section id="view-board" class="board" aria-label="Parking availability">
+  <div>
+    <div id="sign" class="sign" aria-live="polite"></div>
+    <div id="tariff" class="tariff"></div>
+  </div>
+  <div>
+    <div class="lot-head">
+      <h2>Parking bays</h2>
+      <ul class="legend">
+        <li><span class="sw free"></span>Free</li>
+        <li><span class="sw taken"></span>Taken</li>
+        <li><span class="sw closed"></span>Closed</li>
+      </ul>
+    </div>
+    <div id="lot-board" class="lot"></div>
+  </div>
+</section>
+
+<!-- ============ 2. Entry gate ============ -->
+<section id="view-entry" hidden aria-label="Entry gate">
+  <div class="two">
+    <div>
+      <h2>Vehicle arrival</h2>
+      <p class="lead">Type the number plate to record the vehicle and print a ticket. The nearest free bay is assigned unless you pick one on the map.</p>
+      <label class="field" for="entry-plate">Number plate</label>
+      <input id="entry-plate" class="plate" type="text" placeholder="KDA 123A" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <p class="chosen" id="entry-chosen">Nearest free bay will be assigned.</p>
+      <div class="actions"><button id="entry-go" class="btn primary">Issue ticket</button></div>
+      <div id="entry-msg" class="msg" role="status"></div>
+      <div id="entry-ticket"></div>
+      <div id="entry-barrier"></div>
+    </div>
+    <div>
+      <h3>Pick a bay (optional)</h3>
+      <p class="lead">Select any free bay. Select it again to go back to automatic assignment.</p>
+      <div id="lot-entry" class="lot"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. Exit, payment and barrier ============ -->
+<section id="view-exit" hidden aria-label="Exit and payment">
+  <div class="two">
+    <div>
+      <h2>Vehicle exit</h2>
+      <p class="lead">Enter the number plate to see the time parked and the amount due. The barrier opens once the fee is paid.</p>
+      <label class="field" for="exit-plate">Number plate</label>
+      <input id="exit-plate" class="plate" type="text" placeholder="KDA 123A" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <div class="actions"><button id="exit-check" class="btn primary">Check fee</button></div>
+      <div id="exit-msg" class="msg" role="status"></div>
+      <div id="exit-quote"></div>
+    </div>
+    <div>
+      <div id="exit-barrier"></div>
+      <div id="exit-done"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. Manager ============ -->
+<section id="view-manager" hidden aria-label="Manager">
+  <div id="mgr-login">
+    <h2>Manager sign in</h2>
+    <p class="lead">Enter the manager password to see revenue, vehicles inside and bay controls.</p>
+    <label class="field" for="mgr-pass">Password</label>
+    <input id="mgr-pass" class="input" type="password" autocomplete="current-password">
+    <div class="actions"><button id="mgr-go" class="btn primary">Sign in</button></div>
+    <div id="mgr-msg" class="msg" role="status"></div>
+  </div>
+
+  <div id="mgr-dash" hidden>
+    <div class="lot-head">
+      <h2>Today in the car park</h2>
+      <button id="mgr-out" class="btn ghost small">Sign out</button>
+    </div>
+    <dl id="ledger" class="ledger"></dl>
+    <p id="by-method" class="note"></p>
+
+    <div class="cols">
+      <div>
+        <h3>Vehicles inside</h3>
+        <div class="scroll"><table id="tbl-active"></table></div>
+      </div>
+      <div>
+        <h3>Recent activity</h3>
+        <ul id="feed" class="feed"></ul>
+      </div>
+    </div>
+
+    <section class="block">
+      <h3>Completed visits</h3>
+      <div class="scroll"><table id="tbl-history"></table></div>
+    </section>
+
+    <section class="block">
+      <h3>Manage bays</h3>
+      <p class="lead">Add bays to a zone, or select a free bay to close it for maintenance. Select a closed bay to open it again.</p>
+      <div class="inline">
+        <div><label class="field" for="add-zone" style="margin-top:0">Zone</label><input id="add-zone" class="input" maxlength="3" placeholder="D" autocapitalize="characters"></div>
+        <div><label class="field" for="add-count" style="margin-top:0">Number of bays</label><input id="add-count" class="input" type="number" min="1" max="100" value="5"></div>
+        <button id="add-go" class="btn">Add bays</button>
+      </div>
+      <div id="mgr-bays-msg" class="msg" role="status"></div>
+      <div id="lot-mgr" class="lot" style="margin-top:16px"></div>
+    </section>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ==========================================================================
+   ParkSmart KE - front-end logic (plain JavaScript, no libraries)
+   Talks to the C++ server through the REST API described in src/main.cpp.
+   ========================================================================== */
+'use strict';
+
+const $ = (sel) => document.querySelector(sel);
+const state = {
+  config: { demo: false },
+  status: null,          // last /api/status response
+  selectedSlot: null,    // bay picked on the entry screen
+  quote: null,           // current exit quote
+  quoteAt: 0,            // when the quote arrived (ms) - used for the live timer
+  adminKey: sessionStorage.getItem('parksmart-admin') || '',
+  view: 'board',
+};
+
+/* ---------- small helpers ---------- */
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = (n) => 'Kshs ' + Number(n).toLocaleString('en-KE');
+const clock = (t) => new Date(t * 1000).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+const dateTime = (t) => new Date(t * 1000).toLocaleString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+function duration(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h ? `${h} h ${pad(m)} min ${pad(s)} s` : m ? `${m} min ${pad(s)} s` : `${s} s`;
+}
+function roughDuration(sec) {           // "1 h 29 min", "12 min"
+  const m = Math.ceil(sec / 60), h = Math.floor(m / 60);
+  return h ? `${h} h ${m % 60} min` : `${m} min`;
+}
+function message(sel, text, kind) {     // show a status message in a live region
+  const el = $(sel);
+  el.textContent = text || '';
+  el.className = 'msg' + (kind ? ' ' + kind : '');
+}
+function busy(btn, on) { btn.disabled = on; }
+
+/* One place for every server call. Throws an Error carrying the server's message. */
+async function api(path, { method = 'GET', params = {}, admin = false } = {}) {
+  const opts = { method, headers: {} };
+  const qs = new URLSearchParams(params).toString();
+  if (method === 'GET') { if (qs) path += '?' + qs; } else { opts.body = new URLSearchParams(params); }
+  if (admin) opts.headers['X-Admin-Key'] = state.adminKey;
+  let res;
+  try { res = await fetch(path, opts); }
+  catch (e) { throw new Error('Cannot reach the parking server. Check that it is running.'); }
+  let data;
+  try { data = await res.json(); }
+  catch (e) { throw new Error('Unexpected reply from the server.'); }
+  if (!res.ok || data.ok === false) {
+    const err = new Error(data.error || 'The request failed.');
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+/* ---------- barrier drawing (used on the entry and exit screens) ---------- */
+function barrierHTML(open, label) {
+  // Stripes are painted on the arm; the whole arm rotates about the pivot on the post.
+  const stripes = [0, 1, 2, 3, 4].map((i) => `<rect x="${78 + i * 44}" y="204" width="22" height="12" fill="#e0503f"/>`).join('');
+  return `<div class="barrier" data-state="${open ? 'open' : 'closed'}">
+    <svg viewBox="0 0 300 270" role="img" aria-label="Barrier ${open ? 'open' : 'closed'}">
+      <rect x="20" y="198" width="40" height="66" rx="3" fill="#343a41"/>
+      <circle class="lamp" cx="40" cy="236" r="9"/>
+      <rect x="272" y="228" width="10" height="36" fill="#343a41"/>
+      <g class="arm"><rect x="40" y="204" width="226" height="12" rx="2" fill="#f1f3f4"/>${stripes}</g>
+    </svg>
+    <p>${esc(label)}</p></div>`;
+}
+function setBarrier(sel, open, label) { $(sel).innerHTML = barrierHTML(false, label); if (open) requestAnimationFrame(() => requestAnimationFrame(() => { const b = $(sel + ' .barrier'); if (b) b.dataset.state = 'open'; })); }
+
+/* ==========================================================================
+   Availability display: LED sign, tariff board and the lot map
+   ========================================================================== */
+const CAR = `<svg class="car" viewBox="0 0 34 56" aria-hidden="true"><rect x="2" y="1" width="30" height="54" rx="9" fill="#e0503f"/><rect x="7" y="11" width="20" height="9" rx="2" fill="#1a1d21" opacity=".75"/><rect x="7" y="35" width="20" height="8" rx="2" fill="#1a1d21" opacity=".75"/></svg>`;
+
+function renderSign() {
+  const s = state.status; if (!s) return;
+  const full = s.summary.free === 0;
+  const zones = s.zones.map((z) => `<li><span>Zone ${esc(z.zone)}</span><span>${z.free} free of ${z.total}</span></li>`).join('');
+  $('#sign').className = 'sign' + (full ? ' full' : '');
+  $('#sign').innerHTML = full
+    ? `<div class="cap">Free slots</div><div class="num">Full</div><div class="of">Please wait for a bay to be released</div><ul class="zones">${zones}</ul>`
+    : `<div class="cap">Free slots</div><div class="num">${s.summary.free}</div><div class="of">of ${s.summary.total - s.summary.maintenance} open bays</div><ul class="zones">${zones}</ul>`;
+}
+function renderTariff() {
+  const s = state.status; if (!s) return;
+  $('#tariff').innerHTML = `<h3>Parking fees</h3><ul>` + s.tariff.map((t) =>
+    `<li><span>${esc(t.description)}</span><span class="fee">${t.fee === 0 ? 'Free' : money(t.fee)}</span></li>`).join('') + `</ul>`;
+}
+/* mode: 'view' (read-only), 'pick' (choose a bay to park in), 'manage' (open/close bays) */
+function renderLot(sel, mode) {
+  const s = state.status; const host = $(sel); if (!s) return;
+  if (!s.slots.length) { host.innerHTML = '<p class="empty">No bays have been set up yet.</p>'; return; }
+  const zones = {};
+  s.slots.forEach((b) => (zones[b.zone] = zones[b.zone] || []).push(b));
+  host.innerHTML = Object.keys(zones).sort().map((z) => {
+    const bays = zones[z].map((b) => {
+      const cls = b.status === 'FREE' ? 'free' : b.status === 'OCCUPIED' ? 'taken' : 'closed';
+      const word = { free: 'free', taken: 'taken', closed: 'closed' }[cls];
+      const clickable = (mode === 'pick' && cls === 'free') || (mode === 'manage' && cls !== 'taken');
+      const sel2 = (mode === 'pick' && state.selectedSlot === b.id) ? ' selected' : '';
+      const inner = (cls === 'taken' ? CAR : '') + `<span class="label">${esc(b.label)}</span>`;
+      return clickable
+        ? `<button class="bay ${cls}${sel2}" data-id="${b.id}" data-status="${cls}" aria-label="Bay ${esc(b.label)}, ${word}" aria-pressed="${sel2 ? 'true' : 'false'}">${inner}</button>`
+        : `<div class="bay ${cls}" role="img" aria-label="Bay ${esc(b.label)}, ${word}">${inner}</div>`;
+    }).join('');
+    return `<div class="zone"><div class="zone-name" aria-hidden="true">${esc(z)}</div><div class="bays">${bays}</div></div>`;
+  }).join('');
+}
+function renderStatus() {
+  renderSign(); renderTariff();
+  renderLot('#lot-board', 'view'); renderLot('#lot-entry', 'pick'); renderLot('#lot-mgr', 'manage');
+}
+let lastStatusKey = '';
+async function refreshStatus(force) {
+  try {
+    const d = await api('/api/status');
+    $('#offline').hidden = true;
+    const key = JSON.stringify([d.summary, d.slots.map((b) => b.status + b.id), d.tariff]);
+    state.status = d;
+    if (force || key !== lastStatusKey) { lastStatusKey = key; renderStatus(); }
+  } catch (e) { $('#offline').hidden = false; }
+}
+
+/* ==========================================================================
+   Entry gate
+   ========================================================================== */
+function updateChosen() {
+  const b = state.status && state.selectedSlot ? state.status.slots.find((x) => x.id === state.selectedSlot) : null;
+  $('#entry-chosen').innerHTML = b
+    ? `You picked bay <strong>${esc(b.label)}</strong>. <button class="link" id="clear-pick">Use the nearest free bay instead</button>`
+    : 'Nearest free bay will be assigned.';
+}
+$('#lot-entry').addEventListener('click', (e) => {
+  const bay = e.target.closest('button.bay'); if (!bay) return;
+  const id = Number(bay.dataset.id);
+  state.selectedSlot = state.selectedSlot === id ? null : id;
+  renderLot('#lot-entry', 'pick'); updateChosen();
+});
+$('#entry-chosen').addEventListener('click', (e) => {
+  if (e.target.id === 'clear-pick') { state.selectedSlot = null; renderLot('#lot-entry', 'pick'); updateChosen(); }
+});
+
+let entryBarrierTimer = null;
+async function issueTicket() {
+  const plate = $('#entry-plate').value.trim();
+  if (!plate) { message('#entry-msg', 'Enter the number plate first.', 'error'); $('#entry-plate').focus(); return; }
+  const btn = $('#entry-go'); busy(btn, true);
+  try {
+    const d = await api('/api/entry', { method: 'POST', params: { plate, slot_id: state.selectedSlot || '' } });
+    message('#entry-msg', d.message, 'ok');
+    $('#entry-ticket').innerHTML = `<div class="ticket">
+      <div><div class="no">${esc(d.ticket)}</div><p>${esc(d.plate)}</p><p>Entered at ${clock(d.entryTime)}</p><p>Enter this plate at the exit gate to pay and leave.</p></div>
+      <div class="stub"><p>Your bay</p><div class="big">${esc(d.slot)}</div></div></div>`;
+    setBarrier('#entry-barrier', true, 'Barrier open');
+    clearTimeout(entryBarrierTimer);
+    entryBarrierTimer = setTimeout(() => setBarrier('#entry-barrier', false, 'Barrier closed'), 7000);
+    $('#entry-plate').value = ''; state.selectedSlot = null; updateChosen();
+  } catch (e) {
+    message('#entry-msg', e.message, 'error');
+    if (e.status === 409) state.selectedSlot = null;
+    setBarrier('#entry-barrier', false, 'Barrier closed');
+    $('#entry-ticket').innerHTML = '';
+  } finally { busy(btn, false); refreshStatus(true); updateChosen(); }
+}
+$('#entry-go').addEventListener('click', issueTicket);
+$('#entry-plate').addEventListener('keydown', (e) => { if (e.key === 'Enter') issueTicket(); });
+
+/* ==========================================================================
+   Exit: quote -> pay -> open barrier
+   ========================================================================== */
+async function checkFee(keepMessages) {
+  const plate = $('#exit-plate').value.trim();
+  if (!plate) { message('#exit-msg', 'Enter the number plate first.', 'error'); $('#exit-plate').focus(); return; }
+  if (!keepMessages) { message('#exit-msg', ''); $('#exit-done').innerHTML = ''; }
+  try {
+    state.quote = await api('/api/exit/quote', { params: { plate } });
+    state.quoteAt = Date.now();
+    renderQuote();
+  } catch (e) {
+    state.quote = null; $('#exit-quote').innerHTML = ''; $('#exit-barrier').innerHTML = '';
+    message('#exit-msg', e.message, 'error');
+  }
+}
+function renderQuote() {
+  const q = state.quote; if (!q) return;
+  const paying = q.due > 0;
+  const method = (document.querySelector('input[name="method"]:checked') || {}).value || 'MPESA';
+  $('#exit-quote').innerHTML = `<div class="panel">
+    <dl class="facts">
+      <dt>Ticket</dt><dd>${esc(q.ticket)}</dd>
+      <dt>Vehicle</dt><dd>${esc(q.plate)}, bay ${esc(q.slot)}</dd>
+      <dt>Entered</dt><dd>${dateTime(q.entryTime)}</dd>
+      <dt>Time parked</dt><dd id="q-elapsed">${duration(q.durationSeconds)}</dd>
+      <dt>Fee band</dt><dd>${esc(q.tier)}</dd>
+      ${q.paid ? `<dt>Already paid</dt><dd>${money(q.paid)}</dd>` : ''}
+    </dl>
+    <div class="due ${paying ? '' : 'clear'}"><span>${paying ? 'Amount due' : 'Nothing to pay'}</span><span class="amt">${paying ? money(q.due) : 'Kshs 0'}</span></div>
+    <p class="note" id="q-next"></p>
+    ${paying ? `
+    <fieldset class="methods"><legend>Payment method</legend>
+      ${[['MPESA', 'M-Pesa'], ['CASH', 'Cash'], ['CARD', 'Card']].map(([v, t]) => `<label><input type="radio" name="method" value="${v}" ${v === method ? 'checked' : ''}>${t}</label>`).join('')}
+    </fieldset>
+    <div id="ref-wrap" ${method === 'MPESA' ? '' : 'hidden'}><label class="field" for="pay-ref">M-Pesa confirmation code</label>
+      <input id="pay-ref" class="input" maxlength="20" placeholder="Leave blank in demo mode" autocomplete="off"></div>
+    <div class="actions"><button class="btn primary" id="pay-go">Pay ${money(q.due)}</button></div>`
+    : `<div class="actions"><button class="btn primary" id="open-go">Open barrier</button></div>`}
+    ${state.config.demo ? `<div class="actions" style="margin-top:14px"><span class="note" style="margin:0">Demo: move arrival time back</span>
+      ${[[30, '30 min'], [90, '1.5 h'], [180, '3 h'], [420, '7 h']].map(([m, t]) => `<button class="btn ghost small" data-sim="${m}">${t}</button>`).join('')}</div>` : ''}
+  </div>`;
+  setBarrier('#exit-barrier', false, paying ? 'Barrier locked until the fee is paid' : 'Barrier closed');
+  tickQuote();
+}
+/* Live timer: the parked time counts up on screen, and the quote is refreshed
+   automatically the moment the driver crosses into a dearer fee band. */
+let refreshing = false;
+function tickQuote() {
+  const q = state.quote; if (!q) return;
+  const elapsed = q.durationSeconds + (Date.now() - state.quoteAt) / 1000;
+  const el = $('#q-elapsed'); if (el) el.textContent = duration(elapsed);
+  const nx = $('#q-next');
+  if (nx) {
+    if (q.nextIncreaseInSeconds >= 0) {
+      const left = q.nextIncreaseInSeconds - (Date.now() - state.quoteAt) / 1000;
+      nx.textContent = `The fee rises to ${money(q.nextFee)} in ${roughDuration(Math.max(left, 0))}.`;
+      if (left <= 0 && !refreshing) { refreshing = true; checkFee(true).finally(() => { refreshing = false; }); message('#exit-msg', 'The fee band changed, so the amount due was updated.', 'warn'); }
+    } else nx.textContent = 'This is the highest fee band.';
+  }
+}
+setInterval(tickQuote, 1000);
+
+$('#exit-check').addEventListener('click', () => checkFee(false));
+$('#exit-plate').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkFee(false); });
+$('#exit-quote').addEventListener('change', (e) => {
+  if (e.target.name === 'method') $('#ref-wrap').hidden = e.target.value !== 'MPESA';
+});
+$('#exit-quote').addEventListener('click', async (e) => {
+  const q = state.quote; if (!q) return;
+  const btn = e.target.closest('button'); if (!btn) return;
+
+  if (btn.id === 'pay-go') {                                  // ---- pay
+    busy(btn, true);
+    try {
+      const method = document.querySelector('input[name="method"]:checked').value;
+      const ref = $('#pay-ref') ? $('#pay-ref').value.trim() : '';
+      const d = await api('/api/exit/pay', { method: 'POST', params: { plate: q.plate, method, reference: ref, amount: q.due } });
+      message('#exit-msg', `${d.message} Receipt ${d.receipt}, reference ${d.reference}.`, 'ok');
+      await checkFee(true);
+    } catch (err) { message('#exit-msg', err.message, 'error'); if (err.status === 409) checkFee(true); busy(btn, false); }
+  } else if (btn.id === 'open-go') {                          // ---- open the barrier
+    busy(btn, true);
+    try {
+      const d = await api('/api/exit/barrier', { method: 'POST', params: { plate: q.plate } });
+      state.quote = null; $('#exit-quote').innerHTML = ''; message('#exit-msg', '');
+      setBarrier('#exit-barrier', true, 'Barrier open');
+      $('#exit-done').innerHTML = `<div class="receipt"><p>${esc(d.plate)} left bay ${esc(d.slot)}</p>
+        <div class="big">${d.fee ? money(d.fee) : 'Free'}</div>
+        <p>Time parked: ${duration(d.durationSeconds)} (${clock(d.entryTime)} to ${clock(d.exitTime)}).</p><p>${esc(d.message)}</p></div>`;
+      $('#exit-plate').value = '';
+      setTimeout(() => setBarrier('#exit-barrier', false, 'Barrier closed'), 8000);
+      refreshStatus(true);
+    } catch (err) { message('#exit-msg', err.message, 'error'); checkFee(true); busy(btn, false); }
+  } else if (btn.dataset.sim) {                               // ---- demo: fast-forward
+    if (!state.adminKey) { message('#exit-msg', 'Demo tools need the manager password. Sign in on the Manager screen first.', 'warn'); return; }
+    try {
+      await api('/api/admin/simulate', { method: 'POST', admin: true, params: { plate: q.plate, minutes: btn.dataset.sim } });
+      message('#exit-msg', `Arrival moved back ${btn.textContent}.`, 'warn'); await checkFee(true);
+    } catch (err) { message('#exit-msg', err.message, 'error'); }
+  }
+});
+
+/* ==========================================================================
+   Manager
+   ========================================================================== */
+function showManager(signedIn) { $('#mgr-login').hidden = signedIn; $('#mgr-dash').hidden = !signedIn; }
+async function signIn(e) {
+  state.adminKey = $('#mgr-pass').value;
+  try { await api('/api/admin/report', { admin: true }); }
+  catch (err) { state.adminKey = ''; message('#mgr-msg', err.status === 401 ? 'Wrong password. Try again.' : err.message, 'error'); return; }
+  sessionStorage.setItem('parksmart-admin', state.adminKey);
+  $('#mgr-pass').value = ''; message('#mgr-msg', ''); showManager(true); loadDashboard();
+}
+$('#mgr-go').addEventListener('click', signIn);
+$('#mgr-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
+$('#mgr-out').addEventListener('click', () => { state.adminKey = ''; sessionStorage.removeItem('parksmart-admin'); showManager(false); });
+
+async function loadDashboard() {
+  if (!state.adminKey) return;
+  try {
+    const [rep, act, his, evt] = await Promise.all([
+      api('/api/admin/report', { admin: true }), api('/api/admin/tickets', { admin: true }),
+      api('/api/admin/history', { admin: true, params: { limit: 15 } }), api('/api/admin/events', { admin: true })]);
+    $('#ledger').innerHTML = [
+      ['Revenue today', money(rep.revenueToday)], ['Revenue all time', money(rep.revenueAllTime)],
+      ['Vehicles inside', `${rep.insideNow} of ${rep.totalSlots}`], ['Entered today', rep.enteredToday],
+      ['Exited today', rep.exitedToday], ['Average stay today', rep.averageSecondsToday ? roughDuration(rep.averageSecondsToday) : 'None yet'],
+    ].map(([t, v]) => `<div><dt>${t}</dt><dd>${v}</dd></div>`).join('');
+    const names = { MPESA: 'M-Pesa', CASH: 'Cash', CARD: 'Card' };
+    $('#by-method').textContent = rep.byMethod.length ? 'Received today: ' + rep.byMethod.map((m) => `${names[m.method] || m.method} ${money(m.amount)}`).join(', ') + '.' : 'No payments received today.';
+
+    const demo = state.config.demo;
+    $('#tbl-active').innerHTML = act.tickets.length
+      ? `<tr><th>Ticket</th><th>Vehicle</th><th>Bay</th><th>Entered</th><th>Parked</th><th class="num">Fee now</th><th class="num">Paid</th>${demo ? '<th>Demo: move arrival back</th>' : ''}</tr>` +
+        act.tickets.map((t) => `<tr><td>${esc(t.ticket)}</td><td>${esc(t.plate)}</td><td>${esc(t.slot)}</td><td>${clock(t.entryTime)}</td><td>${roughDuration(t.durationSeconds)}</td><td class="num">${money(t.fee)}</td><td class="num">${money(t.paid)}</td>` +
+          (demo ? `<td>${[[30, '30 min'], [90, '1.5 h'], [180, '3 h'], [420, '7 h']].map(([m, x]) => `<button class="btn ghost small" data-sim-plate="${esc(t.plate)}" data-min="${m}">${x}</button>`).join(' ')}</td>` : '') + `</tr>`).join('')
+      : '<tr><td>No vehicles inside right now.</td></tr>';
+    $('#tbl-history').innerHTML = his.visits.length
+      ? `<tr><th>Ticket</th><th>Vehicle</th><th>Bay</th><th>Entered</th><th>Left</th><th>Parked</th><th class="num">Fee</th></tr>` +
+        his.visits.map((v) => `<tr><td>${esc(v.ticket)}</td><td>${esc(v.plate)}</td><td>${esc(v.slot)}</td><td>${dateTime(v.entryTime)}</td><td>${dateTime(v.exitTime)}</td><td>${roughDuration(v.durationSeconds)}</td><td class="num">${v.fee ? money(v.fee) : 'Free'}</td></tr>`).join('')
+      : '<tr><td>No completed visits yet.</td></tr>';
+    $('#feed').innerHTML = evt.events.length ? evt.events.map((x) => `<li><time>${clock(x.time)}</time>${esc(x.text)}</li>`).join('') : '<li>No activity yet.</li>';
+  } catch (err) {
+    if (err.status === 401) { showManager(false); message('#mgr-msg', 'Session expired. Sign in again.', 'error'); }
+  }
+}
+$('#tbl-active').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-sim-plate]'); if (!b) return;
+  try { await api('/api/admin/simulate', { method: 'POST', admin: true, params: { plate: b.dataset.simPlate, minutes: b.dataset.min } }); loadDashboard(); }
+  catch (err) { message('#mgr-bays-msg', err.message, 'error'); }
+});
+$('#add-go').addEventListener('click', async () => {
+  try {
+    const d = await api('/api/admin/slots', { method: 'POST', admin: true, params: { zone: $('#add-zone').value.trim(), count: $('#add-count').value } });
+    message('#mgr-bays-msg', d.message, 'ok'); await refreshStatus(true); loadDashboard();
+  } catch (err) { message('#mgr-bays-msg', err.message, 'error'); }
+});
+$('#lot-mgr').addEventListener('click', async (e) => {
+  const bay = e.target.closest('button.bay'); if (!bay) return;
+  try {
+    const d = await api('/api/admin/maintenance', { method: 'POST', admin: true, params: { slot_id: bay.dataset.id, on: bay.dataset.status === 'free' ? '1' : '0' } });
+    message('#mgr-bays-msg', d.message, 'ok'); await refreshStatus(true);
+  } catch (err) { message('#mgr-bays-msg', err.message, 'error'); }
+});
+
+/* ==========================================================================
+   Navigation and start-up
+   ========================================================================== */
+function showView(name) {
+  state.view = name;
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === name)));
+  ['board', 'entry', 'exit', 'manager'].forEach((v) => { $('#view-' + v).hidden = v !== name; });
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  if (name === 'manager') { showManager(!!state.adminKey); loadDashboard(); }
+  refreshStatus(true); updateChosen();
+}
+document.querySelector('.tabs').addEventListener('click', (e) => {
+  const t = e.target.closest('.tab'); if (t) showView(t.dataset.view);
+});
+
+(async function start() {
+  try { state.config = await api('/api/config'); } catch (e) { /* offline banner is shown by refreshStatus */ }
+  const first = location.hash.slice(1);
+  showView(['board', 'entry', 'exit', 'manager'].includes(first) ? first : 'board');
+  setInterval(refreshStatus, 3000);                              // keep the display live
+  setInterval(() => { if (state.view === 'manager') loadDashboard(); }, 5000);
+})();
+</script>
+</body>
+</html>

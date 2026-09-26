@@ -1,0 +1,10 @@
+# build output
+parksmart
+parksmart.exe
+test_core
+test_core.exe
+build/
+# local database files (created on first run)
+*.db
+*.db-wal
+*.db-shm
